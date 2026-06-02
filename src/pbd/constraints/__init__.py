@@ -4,6 +4,7 @@ from pbd.constraints.collision import (
     CollisionGroup,
     Plane,
     Sphere,
+    TriangleMesh,
     generate_collision_constraints,
 )
 from pbd.constraints.distance import Stretch
@@ -16,6 +17,7 @@ __all__ = [
     "Volume",
     "Plane",
     "Sphere",
+    "TriangleMesh",
     "CollisionGroup",
     "generate_collision_constraints",
 ]

@@ -126,8 +126,10 @@ class System:
         P = self.X + dt * self.V
 
         # (8) generate per-step collision constraints (paper §6).
+        # Pass both X (pre-step) and P (predicted) so CCD colliders like
+        # TriangleMesh can ray-cast the segment; SDF colliders just use P.
         coll = generate_collision_constraints(
-            P, self.colliders, free, k=1.0, skin=contact_skin
+            self.X, P, self.colliders, free, k=1.0, skin=contact_skin
         )
         n_static = len(self.constraints)
 

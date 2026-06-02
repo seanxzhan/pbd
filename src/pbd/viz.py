@@ -88,6 +88,7 @@ class Viewer:
         self._solver: str = "jacobi"
         self._contact_skin: float = 0.0
         self._step_callback: Optional[Callable[[int], None]] = None
+        self._ui_callback: Optional[Callable[[], None]] = None
         self._frame: int = 0
         self._playing: bool = True
 
@@ -156,11 +157,16 @@ class Viewer:
         solver: str = "jacobi",
         contact_skin: float = 0.0,
         on_step: Optional[Callable[[int], None]] = None,
+        on_ui: Optional[Callable[[], None]] = None,
     ):
         """Open the viewer and step the simulation each frame.
 
         The values passed here become the *initial* values of the live
         sliders; the user can change them in the UI without restarting.
+
+        ``on_ui`` is invoked at the bottom of the imgui sidebar each
+        frame — examples can use it to add scene-specific controls
+        (e.g. toggling an obstacle on / off).
         """
         if solver not in ("jacobi", "gauss-seidel"):
             raise ValueError(
@@ -174,6 +180,7 @@ class Viewer:
         self._solver = solver
         self._contact_skin = contact_skin
         self._step_callback = on_step
+        self._ui_callback = on_ui
         self._ps.set_user_callback(self._tick)
         self._ps.show()
 
@@ -243,6 +250,10 @@ class Viewer:
             _, self._contact_skin = psim.SliderFloat(
                 "contact skin", float(self._contact_skin), 0.0, 0.05
             )
+
+        if self._ui_callback is not None:
+            psim.Separator()
+            self._ui_callback()
 
         psim.Separator()
         psim.Text(f"frame {self._frame}    dt {self._dt:.4f}")

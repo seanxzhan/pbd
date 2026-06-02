@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from pbd import Plane, Sphere, Stretch, System
+from pbd import Plane, Sphere, Stretch, System, TriangleMesh
 
 
 def _single_particle(pos, v=(0.0, 0.0, 0.0), gravity=(0.0, 0.0, -9.81)):
@@ -148,3 +148,114 @@ def test_cloth_drape_settles_on_plane():
 
     # All three vertices must be on or above the plane.
     assert (sys.X[:, 2] >= -1e-9).all(), f"penetration: zs={sys.X[:, 2]}"
+
+
+# ----------------------------------------------------- triangle mesh CCD
+
+
+def _unit_quad_xy_plane():
+    """One axis-aligned quad in the z=0 plane, two CCW triangles, normal +z."""
+    V = np.array([
+        [-1.0, -1.0, 0.0],
+        [1.0, -1.0, 0.0],
+        [1.0, 1.0, 0.0],
+        [-1.0, 1.0, 0.0],
+    ])
+    F = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int64)
+    return V, F
+
+
+def test_trianglemesh_validates_shape():
+    import pytest
+
+    with pytest.raises(ValueError):
+        TriangleMesh(np.zeros((3, 2)), np.zeros((1, 3), dtype=np.int64))
+    with pytest.raises(ValueError):
+        TriangleMesh(np.zeros((3, 3)), np.zeros((1, 4), dtype=np.int64))
+
+
+def test_trianglemesh_rejects_degenerate_face():
+    import pytest
+
+    V = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+    F = np.array([[0, 1, 2]], dtype=np.int64)        # collinear → zero area
+    with pytest.raises(ValueError):
+        TriangleMesh(V, F)
+
+
+def test_trianglemesh_particle_falls_onto_quad():
+    """Particle starts above the quad and falls; CCD must catch the segment
+    crossing and push it back to z >= 0."""
+    V, F = _unit_quad_xy_plane()
+    sys = _single_particle(pos=(0.0, 0.0, 0.5))   # gravity = (0,0,-9.81)
+    sys.add_collider(TriangleMesh(V, F))
+
+    for _ in range(300):
+        sys.step(dt=1e-2, iters=1, restitution=0.0, friction=0.0)
+
+    z = sys.X[0, 2]
+    assert z >= -1e-9, f"penetration through mesh: z={z}"
+    assert z < 1e-6, f"particle should rest on z=0; got z={z}"
+
+
+def test_trianglemesh_no_hit_when_particle_misses():
+    """Particle moves but stays clear of the (small) quad — no collision
+    constraint should be generated, so motion is pure ballistics."""
+    V, F = _unit_quad_xy_plane()
+    # Move particle far off to one side so its segment doesn't cross the quad.
+    sys = _single_particle(pos=(5.0, 5.0, 0.5), gravity=(0.0, 0.0, 0.0))
+    sys.V[0] = (0.0, 0.0, -1.0)
+    sys.add_collider(TriangleMesh(V, F))
+
+    sys.step(dt=1e-2, iters=1)
+    # Predicted z = 0.5 + dt * -1 = 0.49; no collision, position unchanged
+    # by projection.
+    np.testing.assert_allclose(sys.X[0], [5.0, 5.0, 0.49], atol=1e-12)
+
+
+def test_trianglemesh_auto_orients_normal():
+    """Approach the quad from below (-z side): the face normal would be
+    +z by winding, but auto-orient must flip it to -z to push us back."""
+    V, F = _unit_quad_xy_plane()
+    sys = _single_particle(pos=(0.0, 0.0, -0.5), gravity=(0.0, 0.0, 0.0))
+    sys.V[0] = (0.0, 0.0, 5.0)                    # heading +z, will pierce quad
+    sys.add_collider(TriangleMesh(V, F))
+
+    sys.step(dt=1e-1, iters=1, restitution=0.0, friction=0.0)
+    # Should be pushed back to z ≈ 0 from below (z ≤ 0).
+    assert sys.X[0, 2] <= 1e-9, (
+        f"auto-orient failed; particle pushed past mesh to z={sys.X[0, 2]}"
+    )
+
+
+def test_trianglemesh_matches_plane_for_planar_obstacle():
+    """A flat triangulated quad in the z=0 plane should behave just like
+    a Plane(normal=+z, offset=0) for a falling particle."""
+    V, F = _unit_quad_xy_plane()
+
+    sys_mesh = _single_particle(pos=(0.0, 0.0, 0.5))
+    sys_mesh.add_collider(TriangleMesh(V, F))
+
+    sys_plane = _single_particle(pos=(0.0, 0.0, 0.5))
+    sys_plane.add_collider(Plane(normal=(0.0, 0.0, 1.0), offset=0.0))
+
+    for _ in range(200):
+        sys_mesh.step(dt=1e-2, iters=1, restitution=0.0, friction=0.0)
+        sys_plane.step(dt=1e-2, iters=1, restitution=0.0, friction=0.0)
+
+    # Both should rest at the same z (within 1e-9).
+    np.testing.assert_allclose(sys_mesh.X[0, 2], sys_plane.X[0, 2], atol=1e-9)
+
+
+def test_trianglemesh_pinned_particle_unaffected():
+    """A pinned vertex must not be moved by CCD even if its segment crosses
+    the mesh — we never generate constraints for W=0 verts."""
+    V, F = _unit_quad_xy_plane()
+    sys = _single_particle(pos=(0.0, 0.0, 0.5))
+    sys.V[0] = (0.0, 0.0, -10.0)                  # would pierce quad
+    sys.pin([0])
+    sys.add_collider(TriangleMesh(V, F))
+
+    x0 = sys.X[0].copy()
+    sys.step(dt=1e-1, iters=1)
+    np.testing.assert_array_equal(sys.X[0], x0)

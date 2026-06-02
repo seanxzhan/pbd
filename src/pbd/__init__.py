@@ -5,9 +5,10 @@ from pbd.constraints import (
     Plane,
     Sphere,
     Stretch,
+    TriangleMesh,
     Volume,
 )
-from pbd.io import load_obj
+from pbd.io import convex_hull, fix_winding, load_obj
 from pbd.mesh import Mesh, NonManifoldError, build_mesh
 from pbd.system import System
 
@@ -21,7 +22,10 @@ __all__ = [
     "Sphere",
     "Stretch",
     "System",
+    "TriangleMesh",
     "Volume",
     "build_mesh",
+    "convex_hull",
+    "fix_winding",
     "load_obj",
 ]

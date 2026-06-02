@@ -43,7 +43,7 @@ def main():
     ap.add_argument("--solver", choices=["jacobi", "gauss-seidel"],
                     default="jacobi",
                     help="Constraint solver: Jacobi (default) or graph-colored Gauss-Seidel")
-    ap.add_argument("--sphere-visual-inset", type=float, default=0.002,
+    ap.add_argument("--sphere-visual-inset", type=float, default=0.01,
                     help="Shrink rendered sphere radius by this much to hide the "
                          "chord-vs-arc dip between contact verts (physics unchanged). "
                          "Try ~L^2/(8·r) where L is cell side.")
