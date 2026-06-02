@@ -81,6 +81,7 @@ class System:
         restitution: float = 0.0,
         friction: float = 0.0,
         solver: str = "jacobi",
+        contact_skin: float = 0.0,
     ) -> None:
         """One PBD step. See paper §3.1 lines (5)–(16).
 
@@ -97,6 +98,13 @@ class System:
             class sees the corrections from previous classes. Roughly
             doubles the convergence rate on cloth, at the cost of one
             small Python loop per group per iter.
+        contact_skin : float
+            Hysteresis band for collision detection. A vertex whose
+            predicted position is within ``contact_skin`` of a collider
+            surface (still outside) gets a constraint generated that is
+            armed-but-inactive — the projection fires only if stretch
+            tries to pull it through. Setting ~1e-3 kills the toggle
+            jitter you get at the contact ring on a sphere or floor.
         """
         if solver not in ("jacobi", "gauss-seidel"):
             raise ValueError(
@@ -118,7 +126,9 @@ class System:
         P = self.X + dt * self.V
 
         # (8) generate per-step collision constraints (paper §6).
-        coll = generate_collision_constraints(P, self.colliders, free, k=1.0)
+        coll = generate_collision_constraints(
+            P, self.colliders, free, k=1.0, skin=contact_skin
+        )
         n_static = len(self.constraints)
 
         # §3.3 stiffness linearization: pre-compute k' per group so the

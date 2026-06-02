@@ -169,6 +169,7 @@ def generate_collision_constraints(
     colliders,
     free_mask: np.ndarray,
     k: float = 1.0,
+    skin: float = 0.0,
 ) -> CollisionGroup:
     """Build a CollisionGroup from the predicted positions.
 
@@ -180,11 +181,20 @@ def generate_collision_constraints(
     free_mask : (N,) bool
         Only generate constraints for particles with W > 0; pinned ones
         cannot move and would just create degenerate constraints.
+    skin : float
+        Contact-detection tolerance. A vertex with ``sdf < skin`` (i.e.
+        either inside the surface or within ``skin`` of it) gets a
+        constraint generated. Constraints with ``sdf > 0`` are "armed
+        but inactive" (the projection only fires when C < 0), giving
+        contact hysteresis: a vertex that just grazes the surface keeps
+        its constraint next step instead of toggling on/off as it drifts
+        across the sdf=0 boundary. Recommended ~1e-3 for cloth on smooth
+        obstacles.
     """
     idx_list, n_list, off_list = [], [], []
     for c in colliders:
         sdf = c.signed_distance(P)                    # (N,)
-        hit = (sdf < 0.0) & free_mask                  # bool mask
+        hit = (sdf < skin) & free_mask                 # bool mask
         if not hit.any():
             continue
         Phit = P[hit]

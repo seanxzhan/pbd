@@ -86,6 +86,7 @@ class Viewer:
         self._restitution: float = 0.0
         self._friction: float = 0.0
         self._solver: str = "jacobi"
+        self._contact_skin: float = 0.0
         self._step_callback: Optional[Callable[[int], None]] = None
         self._frame: int = 0
         self._playing: bool = True
@@ -108,14 +109,23 @@ class Viewer:
         floor_F = np.array([[0, 1, 2], [0, 2, 3]])
         self._ps.register_surface_mesh("floor", floor_V, floor_F).set_color((0.5, 0.5, 0.5))
 
-    def add_sphere_obstacle(self, center, radius: float):
+    def add_sphere_obstacle(self, center, radius: float, visual_inset: float = 0.0):
+        """Register a spherical obstacle.
+
+        ``visual_inset`` shrinks only the *rendered* radius (physics
+        radius is unchanged). Use this to hide the sagitta artifact
+        where flat triangle faces between adjacent contact verts cut
+        a chord below the sphere's arc — for cell length L the dip is
+        ~L²/(8·r). Setting visual_inset = sagitta makes the chord
+        midpoints visually meet the rendered surface.
+        """
         from pbd.constraints.collision import Sphere
 
         c = np.asarray(center, dtype=np.float64)
         self.sys.add_collider(Sphere(center=c, radius=radius))
         pc = self._ps.register_point_cloud(f"obstacle_{len(self.sys.colliders)}",
                                             c.reshape(1, 3))
-        pc.set_radius(radius, relative=False)
+        pc.set_radius(max(radius - visual_inset, 1e-6), relative=False)
         pc.set_color((0.7, 0.3, 0.3))
 
     # ---------------------------------------------------- reset
@@ -144,6 +154,7 @@ class Viewer:
         restitution: float = 0.0,
         friction: float = 0.0,
         solver: str = "jacobi",
+        contact_skin: float = 0.0,
         on_step: Optional[Callable[[int], None]] = None,
     ):
         """Open the viewer and step the simulation each frame.
@@ -161,6 +172,7 @@ class Viewer:
         self._restitution = restitution
         self._friction = friction
         self._solver = solver
+        self._contact_skin = contact_skin
         self._step_callback = on_step
         self._ps.set_user_callback(self._tick)
         self._ps.show()
@@ -174,6 +186,7 @@ class Viewer:
                 restitution=self._restitution,
                 friction=self._friction,
                 solver=self._solver,
+                contact_skin=self._contact_skin,
             )
             self.mesh.update_vertex_positions(self.sys.X)
             self._frame += 1
@@ -226,6 +239,9 @@ class Viewer:
             )
             _, self._friction = psim.SliderFloat(
                 "friction μ", float(self._friction), 0.0, 1.0
+            )
+            _, self._contact_skin = psim.SliderFloat(
+                "contact skin", float(self._contact_skin), 0.0, 0.05
             )
 
         psim.Separator()

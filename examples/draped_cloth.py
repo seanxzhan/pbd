@@ -43,14 +43,18 @@ def main():
     ap.add_argument("--solver", choices=["jacobi", "gauss-seidel"],
                     default="jacobi",
                     help="Constraint solver: Jacobi (default) or graph-colored Gauss-Seidel")
+    ap.add_argument("--sphere-visual-inset", type=float, default=0.002,
+                    help="Shrink rendered sphere radius by this much to hide the "
+                         "chord-vs-arc dip between contact verts (physics unchanged). "
+                         "Try ~L^2/(8·r) where L is cell side.")
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--smoke-frames", type=int, default=120)
     args = ap.parse_args()
 
     mesh = make_grid_mesh(args.n)
     sys = System.from_mesh(mesh, density=1.0, gravity=(0.0, -9.81, 0.0))
-    sys.add_constraint(Stretch.from_mesh(mesh, k=0.9))
-    sys.add_constraint(Bend.from_mesh(mesh, k=0.2))
+    sys.add_constraint(Stretch.from_mesh(mesh, k=0.99))
+    sys.add_constraint(Bend.from_mesh(mesh, k=0.3))
 
     if args.smoke:
         # Manually wire colliders without the viewer (no GUI deps).
@@ -74,10 +78,15 @@ def main():
     viewer = Viewer(sys, mesh.F, name="cloth")
     viewer.add_floor(y=0.0)
     if not args.no_sphere:
-        viewer.add_sphere_obstacle(center=(0.0, 0.5, 0.0), radius=0.4)
+        viewer.add_sphere_obstacle(
+            center=(0.0, 0.5, 0.0),
+            radius=0.4,
+            visual_inset=args.sphere_visual_inset,
+        )
 
     viewer.run(dt=args.dt, iters=args.iters, k_damp=0.05,
-               restitution=0.0, friction=0.4, solver=args.solver)
+               restitution=0.0, friction=0.8, solver=args.solver,
+               contact_skin=0.002)
 
 
 if __name__ == "__main__":
