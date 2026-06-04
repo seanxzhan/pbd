@@ -1,13 +1,31 @@
 # Implementation of Position Based Dynamics
 
-Generate dataset and visualize:
+## Installation
+
 ```bash
-python examples/windblown_data_gen.py \
-  --obj ~/projects/proxy-asset-gen/data/9423122485_cleaned_proxy.obj \
-  --axis direction \
-  --train-frames 600 --test-frames 200 \
-  --pin-fraction 0.10 \
-  --mag-train 0.3 0.3 --mag-test 0.3 0.3 \
-  --turbulence-std 0.0 --coherence 1.0 --viz \
-  --out data/9423122485_cleaned_proxy
+conda env create -f env_mac.yml
+pip install -e .
+```
+
+## Run
+
+Examples
+```bash
+# Cloth hanging 
+python examples/hanging_cloth.py
+
+# Blowing wind at a cloth
+python examples/windblown.py
+
+# Cloth falling on a ball (collision by SDF)
+python examples/draped_on_ball.py
+
+# Cloth falling on a mesh (collision by mesh)
+python examples/draped_on_mesh.py --obj data/spot_simplified.obj --convex-hull
+```
+
+## Test Cases
+
+```bash
+python -m pytest
 ```
