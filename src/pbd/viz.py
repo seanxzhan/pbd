@@ -60,7 +60,7 @@ class Viewer:
 
         self.sys = sys
         self.F = np.ascontiguousarray(F, dtype=np.int64)
-        self.mesh = ps.register_surface_mesh(name, sys.X, self.F)
+        self.mesh = ps.register_surface_mesh(name, sys.X, self.F, edge_width=1.0)
         self.mesh.set_smooth_shade(True)
 
         # Snapshot for Reset.
